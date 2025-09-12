@@ -661,331 +661,160 @@
     </div>
 
     <script>
-        const API_URL = 'https://34198e15d0cb.ngrok-free.app';
-        
-        let fileInput = document.getElementById('fileInput');
-        let progressContainer = document.getElementById('progressContainer');
-        let progressFill = document.getElementById('progressFill');
-        let progressText = document.getElementById('progressText');
+const API_URL = ""; // relative to same origin
 
-        fileInput.addEventListener('change', handleFileUpload);
+// ==== Upload File ====
+document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fileInput = document.getElementById("fileInput");
+  if (!fileInput.files.length) {
+    alert("Please select a file.");
+    return;
+  }
 
-        const uploadArea = document.querySelector('.upload-area');
-        
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.style.borderColor = 'rgba(128, 128, 128, 0.7)';
-            uploadArea.style.backgroundColor = 'rgba(40, 40, 40, 0.9)';
-        });
+  const formData = new FormData();
+  formData.append("file", fileInput.files[0]);
 
-        uploadArea.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            uploadArea.style.borderColor = 'rgba(96, 96, 96, 0.5)';
-            uploadArea.style.backgroundColor = 'rgba(32, 32, 32, 0.8)';
-        });
+  try {
+    const res = await fetch(`${API_URL}/upload`, { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Upload failed");
 
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.style.borderColor = 'rgba(96, 96, 96, 0.5)';
-            uploadArea.style.backgroundColor = 'rgba(32, 32, 32, 0.8)';
-            
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                handleFileUpload();
-            }
-        });
+    alert(`✅ Uploaded: ${data.original_filename}`);
+    loadFiles();
+    loadStats();
+  } catch (err) {
+    console.error(err);
+    alert("❌ Upload failed: " + err.message);
+  }
+});
 
-        document.addEventListener('mousemove', function(e) {
-            const mouseX = e.clientX / window.innerWidth;
-            const mouseY = e.clientY / window.innerHeight;
-            
-            const cards = document.querySelectorAll('.header-card, .main-card');
-            cards.forEach(card => {
-                card.style.transform = `translateX(${mouseX * 5 - 2.5}px) translateY(${mouseY * 5 - 2.5}px)`;
-            });
-        });
+// ==== Load File List ====
+async function loadFiles() {
+  try {
+    const res = await fetch(`${API_URL}/files`);
+    if (!res.ok) throw new Error("Failed to load files");
 
-        async function handleFileUpload() {
-            const files = fileInput.files;
-            if (files.length === 0) return;
+    const files = await res.json();
+    const fileList = document.getElementById("fileList");
+    fileList.innerHTML = "";
 
-            progressContainer.style.display = 'block';
-            
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const formData = new FormData();
-                formData.append('file', file);
+    if (!files.length) {
+      fileList.innerHTML = "<li>No files uploaded yet.</li>";
+      return;
+    }
 
-                try {
-                    const xhr = new XMLHttpRequest();
-                    
-                    const uploadPromise = new Promise((resolve, reject) => {
-                        xhr.upload.addEventListener('progress', (e) => {
-                            if (e.lengthComputable) {
-                                const progress = Math.round((e.loaded * 100) / e.total);
-                                updateProgress(progress, `Uploading ${file.name}...`);
-                            }
-                        });
+    files.forEach((file) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <b>${file.name}</b> 
+        (${(file.size / 1024).toFixed(1)} KB) 
+        <br/>Created: ${file.created} | Modified: ${file.modified}
+      `;
 
-                        xhr.addEventListener('load', () => {
-                            if (xhr.status >= 200 && xhr.status < 300) {
-                                resolve(JSON.parse(xhr.responseText));
-                            } else {
-                                reject(new Error(`Upload failed: ${xhr.statusText}`));
-                            }
-                        });
+      const infoBtn = document.createElement("button");
+      infoBtn.textContent = "Info";
+      infoBtn.onclick = () => showFileInfo(file.name);
 
-                        xhr.addEventListener('error', () => {
-                            reject(new Error('Upload failed: Network error'));
-                        });
+      const viewBtn = document.createElement("button");
+      viewBtn.textContent = "View";
+      viewBtn.onclick = () => window.open(`${API_URL}/view/${file.name}`, "_blank");
 
-                        xhr.open('POST', `${API_URL}/upload`);
-                        xhr.send(formData);
-                    });
+      const downloadBtn = document.createElement("button");
+      downloadBtn.textContent = "Download";
+      downloadBtn.onclick = () => window.open(`${API_URL}/download/${file.name}`, "_blank");
 
-                    const result = await uploadPromise;
-                    showNotification('File uploaded to the void!', 'success');
-                    updateProgress(100, `Uploaded ${file.name}`);
-                    
-                } catch (error) {
-                    showNotification('Upload failed: ' + error.message, 'error');
-                    updateProgress(0, 'Upload failed');
-                }
-            }
-
-            setTimeout(() => {
-                progressContainer.style.display = 'none';
-                updateProgress(0, '');
-                fileInput.value = '';
-                loadFiles();
-            }, 1000);
+      const deleteBtn = document.createElement("button");
+      deleteBtn.textContent = "Delete";
+      deleteBtn.onclick = async () => {
+        if (confirm(`Delete ${file.name}?`)) {
+          await fetch(`${API_URL}/delete/${file.name}`, { method: "DELETE" });
+          loadFiles();
+          loadStats();
         }
+      };
 
-        function updateProgress(percent, text) {
-            progressFill.style.width = percent + '%';
-            progressText.textContent = text + ` ${percent}%`;
-        }
+      li.appendChild(infoBtn);
+      li.appendChild(viewBtn);
+      li.appendChild(downloadBtn);
+      li.appendChild(deleteBtn);
+      fileList.appendChild(li);
+    });
+  } catch (err) {
+    console.error(err);
+  }
+}
 
-        async function loadFiles() {
-            const filesList = document.getElementById('filesList');
-            filesList.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i><p>Loading files from the void...</p></div>';
+// ==== Show File Info ====
+async function showFileInfo(filename) {
+  try {
+    const res = await fetch(`${API_URL}/info/${filename}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
 
-            try {
-                const response = await fetch(`${API_URL}/files`);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                const files = await response.json();
+    alert(
+      `📄 File Info:
+Name: ${data.name}
+Size: ${(data.size / 1024).toFixed(1)} KB
+Type: ${data.mimetype}
+Created: ${data.created}
+Modified: ${data.modified}`
+    );
+  } catch (err) {
+    console.error(err);
+    alert("Failed to load file info");
+  }
+}
 
-                if (files.length === 0) {
-                    filesList.innerHTML = '<div class="loading"><i class="fas fa-folder-open"></i><p>The void is empty... no files yet</p></div>';
-                    return;
-                }
+// ==== Search Files ====
+document.getElementById("searchForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const query = document.getElementById("searchInput").value.trim();
+  if (!query) return loadFiles();
 
-                const fileGrid = document.createElement('div');
-                fileGrid.className = 'file-grid';
+  try {
+    const res = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
 
-                files.forEach(file => {
-                    const fileCard = createFileCard(file);
-                    fileGrid.appendChild(fileCard);
-                });
+    const fileList = document.getElementById("fileList");
+    fileList.innerHTML = `<li>🔍 Found ${data.count} file(s) matching "${query}"</li>`;
 
-                filesList.innerHTML = '';
-                filesList.appendChild(fileGrid);
-            } catch (error) {
-                console.error('Failed to load files:', error);
-                filesList.innerHTML = '<div class="loading"><i class="fas fa-exclamation-triangle"></i><p>Failed to load files from the void</p></div>';
-                showNotification('Failed to load files: ' + error.message, 'error');
-            }
-        }
+    data.results.forEach((file) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<b>${file.name}</b> (${(file.size / 1024).toFixed(1)} KB)`;
+      fileList.appendChild(li);
+    });
+  } catch (err) {
+    console.error(err);
+    alert("Search failed");
+  }
+});
 
-        function createFileCard(file) {
-            const card = document.createElement('div');
-            card.className = 'file-card';
+// ==== Load Stats ====
+async function loadStats() {
+  try {
+    const res = await fetch(`${API_URL}/stats`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message);
 
-            const icon = getFileIcon(file.name);
-            const fileSize = formatFileSize(file.size);
+    const statsDiv = document.getElementById("stats");
+    statsDiv.innerHTML = `
+      <p>Total files: ${data.total_files}</p>
+      <p>Total size: ${data.total_size_formatted}</p>
+      <p>By type: ${JSON.stringify(data.file_types)}</p>
+    `;
+  } catch (err) {
+    console.error(err);
+  }
+}
 
-            card.innerHTML = `
-                <div class="file-icon">${icon}</div>
-                <div class="file-name">${file.name}</div>
-                <div class="file-size">${fileSize}</div>
-                <div class="file-actions">
-                    <button class="file-btn download-btn" onclick="downloadFile('${file.name}')">
-                        <i class="fas fa-download"></i> Get
-                    </button>
-                    <button class="file-btn view-btn" onclick="viewFile('${file.name}')">
-                        <i class="fas fa-eye"></i> View
-                    </button>
-                    <button class="file-btn delete-btn" onclick="deleteFile('${file.name}')">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                </div>
-            `;
+// ==== Init ====
+document.addEventListener("DOMContentLoaded", () => {
+  loadFiles();
+  loadStats();
+});
+</script>
 
-            return card;
-        }
-
-        function getFileIcon(filename) {
-            const ext = filename.split('.').pop().toLowerCase();
-            const iconMap = {
-                'pdf': '<i class="fas fa-file-pdf" style="color: #888888;"></i>',
-                'doc': '<i class="fas fa-file-word" style="color: #777777;"></i>',
-                'docx': '<i class="fas fa-file-word" style="color: #777777;"></i>',
-                'xls': '<i class="fas fa-file-excel" style="color: #666666;"></i>',
-                'xlsx': '<i class="fas fa-file-excel" style="color: #666666;"></i>',
-                'ppt': '<i class="fas fa-file-powerpoint" style="color: #999999;"></i>',
-                'pptx': '<i class="fas fa-file-powerpoint" style="color: #999999;"></i>',
-                'jpg': '<i class="fas fa-file-image" style="color: #aaaaaa;"></i>',
-                'jpeg': '<i class="fas fa-file-image" style="color: #aaaaaa;"></i>',
-                'png': '<i class="fas fa-file-image" style="color: #aaaaaa;"></i>',
-                'gif': '<i class="fas fa-file-image" style="color: #aaaaaa;"></i>',
-                'mp4': '<i class="fas fa-file-video" style="color: #777777;"></i>',
-                'avi': '<i class="fas fa-file-video" style="color: #777777;"></i>',
-                'mp3': '<i class="fas fa-file-audio" style="color: #888888;"></i>',
-                'wav': '<i class="fas fa-file-audio" style="color: #888888;"></i>',
-                'txt': '<i class="fas fa-file-alt" style="color: #cccccc;"></i>',
-                'zip': '<i class="fas fa-file-archive" style="color: #999999;"></i>',
-                'rar': '<i class="fas fa-file-archive" style="color: #999999;"></i>'
-            };
-            return iconMap[ext] || '<i class="fas fa-file" style="color: #cccccc;"></i>';
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-
-        async function downloadFile(filename) {
-            try {
-                const response = await fetch(`${API_URL}/download/${encodeURIComponent(filename)}`);
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: 'Download failed' }));
-                    throw new Error(errorData.message || `HTTP ${response.status}`);
-                }
-
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-                
-                showNotification('File retrieved from the void!', 'success');
-            } catch (error) {
-                console.error('Download failed:', error);
-                showNotification('Download failed: ' + error.message, 'error');
-            }
-        }
-
-        async function viewFile(filename) {
-            try {
-                const response = await fetch(`${API_URL}/view/${encodeURIComponent(filename)}`);
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: 'Failed to load file' }));
-                    throw new Error(errorData.message || `HTTP ${response.status}`);
-                }
-
-                const ext = filename.split('.').pop().toLowerCase();
-                const modal = document.getElementById('fileModal');
-                const modalTitle = document.getElementById('modalTitle');
-                const modalBody = document.getElementById('modalBody');
-
-                modalTitle.textContent = filename;
-
-                if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    modalBody.innerHTML = `<img src="${url}" class="file-preview" alt="${filename}">`;
-                } else if (['txt', 'css', 'js', 'html', 'json', 'xml', 'csv', 'md', 'py', 'java', 'cpp', 'c', 'h'].includes(ext)) {
-                    const text = await response.text();
-                    modalBody.innerHTML = `<div class="text-preview">${escapeHtml(text)}</div>`;
-                } else if (ext === 'pdf') {
-                    const blob = await response.blob();
-                    const url = URL.createObjectURL(blob);
-                    modalBody.innerHTML = `<embed src="${url}" type="application/pdf" width="100%" height="500px">`;
-                } else {
-                    modalBody.innerHTML = '<p style="text-align: center; padding: 40px; color: #cccccc;">Preview not available for this file type. Use download to access the file.</p>';
-                }
-
-                modal.style.display = 'block';
-            } catch (error) {
-                console.error('Failed to view file:', error);
-                showNotification('Failed to view file: ' + error.message, 'error');
-            }
-        }
-
-        async function deleteFile(filename) {
-            if (!confirm(`Are you sure you want to send "${filename}" into the void forever?`)) return;
-
-            try {
-                const response = await fetch(`${API_URL}/delete/${encodeURIComponent(filename)}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({ message: 'Delete failed' }));
-                    throw new Error(errorData.message || `HTTP ${response.status}`);
-                }
-
-                const result = await response.json();
-                showNotification('File consumed by the void!', 'success');
-                loadFiles();
-            } catch (error) {
-                console.error('Delete failed:', error);
-                showNotification('Delete failed: ' + error.message, 'error');
-            }
-        }
-
-        function closeModal() {
-            document.getElementById('fileModal').style.display = 'none';
-        }
-
-        function showNotification(message, type) {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-
-            setTimeout(() => notification.classList.add('show'), 100);
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => document.body.removeChild(notification), 300);
-            }, 3000);
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        window.onclick = function(event) {
-            const modal = document.getElementById('fileModal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        }
-
-        document.querySelector('.header-avatar').addEventListener('click', function() {
-            this.style.animation = 'none';
-            setTimeout(() => {
-                this.style.animation = 'pulse 2s infinite';
-            }, 100);
-        });
-
-        document.addEventListener('DOMContentLoaded', loadFiles);
-    </script>
 </body>
 </html>
