@@ -608,7 +608,7 @@
                 <i class="fas fa-cloud"></i>
             </div>
             <h1 class="header-title">Noot Cloud</h1>
-            <p class="header-subtitle">"secure cloud file storage"</p>
+            <p class="header-subtitle">"secure file storage in the void"</p>
         </div>
 
         <div class="main-card">
@@ -616,7 +616,7 @@
                 <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                     <i class="fas fa-cloud-upload-alt"></i>
                     <h3>Upload Files</h3>
-                    <p>Click here or drag and drop files</p>
+                    <p>Click here or drag and drop files into the darkness</p>
                     <button class="upload-btn" type="button">
                         <i class="fas fa-plus"></i> Choose Files
                     </button>
@@ -661,7 +661,7 @@
     </div>
 
     <script>
-        const API_URL = 'https://34198e15d0cb.ngrok-free.app'; // Change this to your ngrok URL
+        const API_URL = 'https://34198e15d0cb.ngrok-free.app';
         
         let fileInput = document.getElementById('fileInput');
         let progressContainer = document.getElementById('progressContainer');
@@ -670,7 +670,6 @@
 
         fileInput.addEventListener('change', handleFileUpload);
 
-        // Drag and drop functionality
         const uploadArea = document.querySelector('.upload-area');
         
         uploadArea.addEventListener('dragover', (e) => {
@@ -697,7 +696,6 @@
             }
         });
 
-        // Parallax effect on mouse move
         document.addEventListener('mousemove', function(e) {
             const mouseX = e.clientX / window.innerWidth;
             const mouseY = e.clientY / window.innerHeight;
@@ -720,25 +718,40 @@
                 formData.append('file', file);
 
                 try {
-                    const response = await fetch(`${API_URL}/upload`, {
-                        method: 'POST',
-                        body: formData,
-                        onUploadProgress: (progressEvent) => {
-                            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                            updateProgress(progress, `Uploading ${file.name}...`);
-                        }
+                    const xhr = new XMLHttpRequest();
+                    
+                    const uploadPromise = new Promise((resolve, reject) => {
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                const progress = Math.round((e.loaded * 100) / e.total);
+                                updateProgress(progress, `Uploading ${file.name}...`);
+                            }
+                        });
+
+                        xhr.addEventListener('load', () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                resolve(JSON.parse(xhr.responseText));
+                            } else {
+                                reject(new Error(`Upload failed: ${xhr.statusText}`));
+                            }
+                        });
+
+                        xhr.addEventListener('error', () => {
+                            reject(new Error('Upload failed: Network error'));
+                        });
+
+                        xhr.open('POST', `${API_URL}/upload`);
+                        xhr.send(formData);
                     });
 
-                    if (response.ok) {
-                        showNotification('File uploaded to the void!', 'success');
-                    } else {
-                        throw new Error('Upload failed');
-                    }
+                    const result = await uploadPromise;
+                    showNotification('File uploaded to the void!', 'success');
+                    updateProgress(100, `Uploaded ${file.name}`);
+                    
                 } catch (error) {
                     showNotification('Upload failed: ' + error.message, 'error');
+                    updateProgress(0, 'Upload failed');
                 }
-
-                updateProgress(100, `Uploaded ${file.name}`);
             }
 
             setTimeout(() => {
@@ -760,6 +773,11 @@
 
             try {
                 const response = await fetch(`${API_URL}/files`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 const files = await response.json();
 
                 if (files.length === 0) {
@@ -778,6 +796,7 @@
                 filesList.innerHTML = '';
                 filesList.appendChild(fileGrid);
             } catch (error) {
+                console.error('Failed to load files:', error);
                 filesList.innerHTML = '<div class="loading"><i class="fas fa-exclamation-triangle"></i><p>Failed to load files from the void</p></div>';
                 showNotification('Failed to load files: ' + error.message, 'error');
             }
@@ -846,7 +865,11 @@
         async function downloadFile(filename) {
             try {
                 const response = await fetch(`${API_URL}/download/${encodeURIComponent(filename)}`);
-                if (!response.ok) throw new Error('Download failed');
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Download failed' }));
+                    throw new Error(errorData.message || `HTTP ${response.status}`);
+                }
 
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
@@ -860,6 +883,7 @@
                 
                 showNotification('File retrieved from the void!', 'success');
             } catch (error) {
+                console.error('Download failed:', error);
                 showNotification('Download failed: ' + error.message, 'error');
             }
         }
@@ -867,7 +891,11 @@
         async function viewFile(filename) {
             try {
                 const response = await fetch(`${API_URL}/view/${encodeURIComponent(filename)}`);
-                if (!response.ok) throw new Error('Failed to load file');
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Failed to load file' }));
+                    throw new Error(errorData.message || `HTTP ${response.status}`);
+                }
 
                 const ext = filename.split('.').pop().toLowerCase();
                 const modal = document.getElementById('fileModal');
@@ -880,7 +908,7 @@
                     const blob = await response.blob();
                     const url = URL.createObjectURL(blob);
                     modalBody.innerHTML = `<img src="${url}" class="file-preview" alt="${filename}">`;
-                } else if (['txt', 'css', 'js', 'html', 'json', 'xml', 'csv'].includes(ext)) {
+                } else if (['txt', 'css', 'js', 'html', 'json', 'xml', 'csv', 'md', 'py', 'java', 'cpp', 'c', 'h'].includes(ext)) {
                     const text = await response.text();
                     modalBody.innerHTML = `<div class="text-preview">${escapeHtml(text)}</div>`;
                 } else if (ext === 'pdf') {
@@ -893,6 +921,7 @@
 
                 modal.style.display = 'block';
             } catch (error) {
+                console.error('Failed to view file:', error);
                 showNotification('Failed to view file: ' + error.message, 'error');
             }
         }
@@ -905,11 +934,16 @@
                     method: 'DELETE'
                 });
 
-                if (!response.ok) throw new Error('Delete failed');
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Delete failed' }));
+                    throw new Error(errorData.message || `HTTP ${response.status}`);
+                }
 
+                const result = await response.json();
                 showNotification('File consumed by the void!', 'success');
                 loadFiles();
             } catch (error) {
+                console.error('Delete failed:', error);
                 showNotification('Delete failed: ' + error.message, 'error');
             }
         }
@@ -937,7 +971,6 @@
             return div.innerHTML;
         }
 
-        // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('fileModal');
             if (event.target === modal) {
@@ -945,7 +978,6 @@
             }
         }
 
-        // Avatar click animation (like in original)
         document.querySelector('.header-avatar').addEventListener('click', function() {
             this.style.animation = 'none';
             setTimeout(() => {
@@ -953,7 +985,6 @@
             }, 100);
         });
 
-        // Load files on page load
         document.addEventListener('DOMContentLoaded', loadFiles);
     </script>
 </body>
