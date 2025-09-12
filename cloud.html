@@ -797,391 +797,463 @@
     <script>
         const API_URL = "https://5c9b61116674.ngrok-free.app"; // Updated for local development
 
-        // File type icons mapping
-        const fileIcons = {
-            'image': 'fas fa-image text-blue-400',
-            'video': 'fas fa-video text-purple-400',
-            'audio': 'fas fa-music text-green-400',
-            'pdf': 'fas fa-file-pdf text-red-400',
-            'text': 'fas fa-file-alt text-gray-400',
-            'archive': 'fas fa-file-archive text-yellow-400',
-            'code': 'fas fa-code text-cyan-400',
-            'default': 'fas fa-file text-gray-400'
-        };
+// File type icons mapping
+const fileIcons = {
+    'image': 'fas fa-image text-blue-400',
+    'video': 'fas fa-video text-purple-400',
+    'audio': 'fas fa-music text-green-400',
+    'pdf': 'fas fa-file-pdf text-red-400',
+    'text': 'fas fa-file-alt text-gray-400',
+    'archive': 'fas fa-file-archive text-yellow-400',
+    'code': 'fas fa-code text-cyan-400',
+    'default': 'fas fa-file text-gray-400'
+};
 
-        function getFileIcon(mimetype) {
-            if (mimetype.startsWith('image/')) return fileIcons.image;
-            if (mimetype.startsWith('video/')) return fileIcons.video;
-            if (mimetype.startsWith('audio/')) return fileIcons.audio;
-            if (mimetype === 'application/pdf') return fileIcons.pdf;
-            if (mimetype.startsWith('text/') || mimetype.includes('json') || mimetype.includes('xml')) return fileIcons.text;
-            if (mimetype.includes('zip') || mimetype.includes('rar') || mimetype.includes('tar')) return fileIcons.archive;
-            if (mimetype.includes('javascript') || mimetype.includes('python') || mimetype.includes('java')) return fileIcons.code;
-            return fileIcons.default;
-        }
+function getFileIcon(mimetype) {
+    if (mimetype.startsWith('image/')) return fileIcons.image;
+    if (mimetype.startsWith('video/')) return fileIcons.video;
+    if (mimetype.startsWith('audio/')) return fileIcons.audio;
+    if (mimetype === 'application/pdf') return fileIcons.pdf;
+    if (mimetype.startsWith('text/') || mimetype.includes('json') || mimetype.includes('xml')) return fileIcons.text;
+    if (mimetype.includes('zip') || mimetype.includes('rar') || mimetype.includes('tar')) return fileIcons.archive;
+    if (mimetype.includes('javascript') || mimetype.includes('python') || mimetype.includes('java')) return fileIcons.code;
+    return fileIcons.default;
+}
 
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
-        function showNotification(message, type = 'success') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.textContent = message;
-            document.body.appendChild(notification);
-            
-            setTimeout(() => notification.classList.add('show'), 100);
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => notification.remove(), 300);
-            }, 3000);
-        }
+function showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => notification.classList.add('show'), 100);
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
 
-        // Drag and drop functionality
-        const uploadSection = document.querySelector('.upload-section');
+// Drag and drop functionality
+const uploadSection = document.querySelector('.upload-section');
+
+uploadSection.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadSection.style.borderColor = 'rgba(128, 128, 128, 0.7)';
+    uploadSection.style.background = 'rgba(40, 40, 40, 0.9)';
+});
+
+uploadSection.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    uploadSection.style.borderColor = 'rgba(96, 96, 96, 0.5)';
+    uploadSection.style.background = 'rgba(32, 32, 32, 0.8)';
+});
+
+uploadSection.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadSection.style.borderColor = 'rgba(96, 96, 96, 0.5)';
+    uploadSection.style.background = 'rgba(32, 32, 32, 0.8)';
+    
+    const files = e.dataTransfer.files;
+    const fileInput = document.getElementById('fileInput');
+    fileInput.files = files;
+    
+    if (files.length > 0) {
+        uploadFiles(files);
+    }
+});
+
+// Upload functionality
+document.getElementById("uploadForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fileInput = document.getElementById("fileInput");
+    if (!fileInput.files.length) {
+        showNotification("Please select files to upload.", "error");
+        return;
+    }
+    uploadFiles(fileInput.files);
+});
+
+document.getElementById("fileInput").addEventListener("change", (e) => {
+    if (e.target.files.length > 0) {
+        uploadFiles(e.target.files);
+    }
+});
+
+async function uploadFiles(files) {
+    const progressContainer = document.getElementById("progressContainer");
+    const progressFill = document.getElementById("progressFill");
+    const progressText = document.getElementById("progressText");
+    
+    progressContainer.style.display = "block";
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append("file", file);
         
-        uploadSection.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadSection.style.borderColor = 'rgba(128, 128, 128, 0.7)';
-            uploadSection.style.background = 'rgba(40, 40, 40, 0.9)';
-        });
-
-        uploadSection.addEventListener('dragleave', (e) => {
-            e.preventDefault();
-            uploadSection.style.borderColor = 'rgba(96, 96, 96, 0.5)';
-            uploadSection.style.background = 'rgba(32, 32, 32, 0.8)';
-        });
-
-        uploadSection.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadSection.style.borderColor = 'rgba(96, 96, 96, 0.5)';
-            uploadSection.style.background = 'rgba(32, 32, 32, 0.8)';
+        try {
+            progressText.textContent = `Uploading ${file.name}... ${Math.round((i / files.length) * 100)}%`;
+            progressFill.style.width = `${(i / files.length) * 100}%`;
             
-            const files = e.dataTransfer.files;
-            const fileInput = document.getElementById('fileInput');
-            fileInput.files = files;
-            
-            if (files.length > 0) {
-                uploadFiles(files);
-            }
-        });
-
-        // Upload functionality
-        document.getElementById("uploadForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const fileInput = document.getElementById("fileInput");
-            if (!fileInput.files.length) {
-                showNotification("Please select files to upload.", "error");
-                return;
-            }
-            uploadFiles(fileInput.files);
-        });
-
-        document.getElementById("fileInput").addEventListener("change", (e) => {
-            if (e.target.files.length > 0) {
-                uploadFiles(e.target.files);
-            }
-        });
-
-        async function uploadFiles(files) {
-            const progressContainer = document.getElementById("progressContainer");
-            const progressFill = document.getElementById("progressFill");
-            const progressText = document.getElementById("progressText");
-            
-            progressContainer.style.display = "block";
-            
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                const formData = new FormData();
-                formData.append("file", file);
-                
-                try {
-                    progressText.textContent = `Uploading ${file.name}... ${Math.round((i / files.length) * 100)}%`;
-                    progressFill.style.width = `${(i / files.length) * 100}%`;
-                    
-                    const res = await fetch(`${API_URL}/upload`, { 
-                        method: "POST", 
-                        body: formData 
-                    });
-                    
-                    if (!res.ok) {
-                        const errorData = await res.json();
-                        throw new Error(errorData.message || "Upload failed");
-                    }
-                    
-                    const data = await res.json();
-                    showNotification(`✅ Uploaded: ${data.original_filename}`);
-                } catch (err) {
-                    console.error(err);
-                    showNotification(`❌ Failed to upload ${file.name}: ${err.message}`, "error");
+            const res = await fetch(`${API_URL}/upload`, { 
+                method: "POST", 
+                body: formData,
+                headers: {
+                    'ngrok-skip-browser-warning': 'true'  // For ngrok
                 }
+            });
+            
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.message || "Upload failed");
             }
             
-            progressFill.style.width = "100%";
-            progressText.textContent = "Upload complete!";
-            
-            setTimeout(() => {
-                progressContainer.style.display = "none";
-                progressFill.style.width = "0%";
-            }, 2000);
-            
-            // Reset file input
-            document.getElementById("fileInput").value = "";
-            
-            // Reload files and stats
-            loadFiles();
-            loadStats();
+            const data = await res.json();
+            showNotification(`✅ Uploaded: ${data.original_filename}`);
+        } catch (err) {
+            console.error(err);
+            showNotification(`❌ Failed to upload ${file.name}: ${err.message}`, "error");
         }
+    }
+    
+    progressFill.style.width = "100%";
+    progressText.textContent = "Upload complete!";
+    
+    setTimeout(() => {
+        progressContainer.style.display = "none";
+        progressFill.style.width = "0%";
+    }, 2000);
+    
+    // Reset file input
+    document.getElementById("fileInput").value = "";
+    
+    // Reload files and stats
+    loadFiles();
+    loadStats();
+}
 
-        // Load files
-        async function loadFiles() {
-            try {
-                const res = await fetch(`${API_URL}/files`);
-                if (!res.ok) throw new Error("Failed to load files");
-
-                const files = await res.json();
-                const filesList = document.getElementById("filesList");
-                
-                if (!files.length) {
-                    filesList.innerHTML = `
-                        <div class="loading">
-                            <i class="fas fa-folder-open"></i>
-                            <p>No files in the void yet. Upload some files to get started!</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const fileGrid = document.createElement('div');
-                fileGrid.className = 'file-grid';
-                
-                files.forEach((file) => {
-                    const fileCard = document.createElement('div');
-                    fileCard.className = 'file-card';
-                    
-                    const iconClass = getFileIcon(file.mimetype || 'application/octet-stream');
-                    
-                    fileCard.innerHTML = `
-                        <div class="file-icon">
-                            <i class="${iconClass}"></i>
-                        </div>
-                        <div class="file-name">${file.original_filename}</div>
-                        <div class="file-size">${formatFileSize(file.size)}</div>
-                        <div class="file-actions">
-                            <button class="file-btn view-btn" onclick="viewFile('${file.filename}', '${file.original_filename}', '${file.mimetype}')">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                            <button class="file-btn download-btn" onclick="downloadFile('${file.filename}', '${file.original_filename}')">
-                                <i class="fas fa-download"></i> Download
-                            </button>
-                            <button class="file-btn delete-btn" onclick="deleteFile('${file.filename}', '${file.original_filename}')">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    `;
-                    
-                    fileGrid.appendChild(fileCard);
-                });
-                
-                filesList.innerHTML = '';
-                filesList.appendChild(fileGrid);
-            } catch (err) {
-                console.error(err);
-                showNotification("Failed to load files", "error");
-            }
-        }
-
-        // Load stats
-        async function loadStats() {
-            try {
-                const res = await fetch(`${API_URL}/stats`);
-                if (!res.ok) throw new Error("Failed to load stats");
-
-                const data = await res.json();
-                const statsDiv = document.getElementById("stats");
-                
-                const fileTypesCount = Object.keys(data.file_types || {}).length;
-                
-                statsDiv.innerHTML = `
-                    <div class="stat-item">
-                        <div class="stat-value">${data.total_files || 0}</div>
-                        <div class="stat-label">Files</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${data.total_size_formatted || '0 Bytes'}</div>
-                        <div class="stat-label">Size</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">${fileTypesCount}</div>
-                        <div class="stat-label">Types</div>
-                    </div>
-                `;
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        // Search functionality
-        document.getElementById("searchForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const query = document.getElementById("searchInput").value.trim();
-            if (!query) return loadFiles();
-
-            try {
-                const res = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}`);
-                if (!res.ok) throw new Error("Search failed");
-
-                const data = await res.json();
-                const filesList = document.getElementById("filesList");
-                
-                if (!data.results || data.results.length === 0) {
-                    filesList.innerHTML = `
-                        <div class="loading">
-                            <i class="fas fa-search"></i>
-                            <p>No files found matching "${query}"</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const fileGrid = document.createElement('div');
-                fileGrid.className = 'file-grid';
-                
-                data.results.forEach((file) => {
-                    const fileCard = document.createElement('div');
-                    fileCard.className = 'file-card';
-                    
-                    const iconClass = getFileIcon(file.mimetype || 'application/octet-stream');
-                    
-                    fileCard.innerHTML = `
-                        <div class="file-icon">
-                            <i class="${iconClass}"></i>
-                        </div>
-                        <div class="file-name">${file.original_filename}</div>
-                        <div class="file-size">${formatFileSize(file.size)}</div>
-                        <div class="file-actions">
-                            <button class="file-btn view-btn" onclick="viewFile('${file.filename}', '${file.original_filename}', '${file.mimetype}')">
-                                <i class="fas fa-eye"></i> View
-                            </button>
-                            <button class="file-btn download-btn" onclick="downloadFile('${file.filename}', '${file.original_filename}')">
-                                <i class="fas fa-download"></i> Download
-                            </button>
-                            <button class="file-btn delete-btn" onclick="deleteFile('${file.filename}', '${file.original_filename}')">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    `;
-                    
-                    fileCard.innerHTML += `<div style="margin-top: 10px; padding: 5px; background: rgba(64,64,64,0.3); border-radius: 5px; font-size: 0.8em; color: #888;">Search result</div>`;
-                    
-                    fileGrid.appendChild(fileCard);
-                });
-                
-                filesList.innerHTML = '';
-                filesList.appendChild(fileGrid);
-                
-                showNotification(`Found ${data.results.length} file(s) matching "${query}"`);
-            } catch (err) {
-                console.error(err);
-                showNotification("Search failed", "error");
+// FIXED: Load files function to handle the correct response format
+async function loadFiles() {
+    try {
+        console.log('Loading files from:', `${API_URL}/files`);
+        
+        const res = await fetch(`${API_URL}/files`, {
+            headers: {
+                'ngrok-skip-browser-warning': 'true'  // For ngrok
             }
         });
-
-        function clearSearch() {
-            document.getElementById("searchInput").value = "";
-            loadFiles();
+        
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error('Response not OK:', res.status, errorText);
+            throw new Error(`Failed to load files: ${res.status} ${res.statusText}`);
         }
 
-        // File operations
-        async function viewFile(filename, originalName, mimetype) {
-            const modal = document.getElementById("fileModal");
-            const modalTitle = document.getElementById("modalTitle");
-            const modalBody = document.getElementById("modalBody");
+        const responseData = await res.json();
+        console.log('Response data:', responseData);
+        
+        // Handle the new response format from your backend
+        let files;
+        if (responseData.success && responseData.files) {
+            files = responseData.files;  // New format: { success: true, count: X, files: [...] }
+        } else if (Array.isArray(responseData)) {
+            files = responseData;  // Old format: direct array
+        } else {
+            console.error('Unexpected response format:', responseData);
+            throw new Error('Unexpected response format');
+        }
+        
+        const filesList = document.getElementById("filesList");
+        
+        if (!files || files.length === 0) {
+            filesList.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-folder-open"></i>
+                    <p>No files in the void yet. Upload some files to get started!</p>
+                </div>
+            `;
+            return;
+        }
+
+        const fileGrid = document.createElement('div');
+        fileGrid.className = 'file-grid';
+        
+        files.forEach((file) => {
+            console.log('Processing file:', file);
             
-            modalTitle.textContent = originalName;
-            modalBody.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i><p>Loading preview...</p></div>';
+            const fileCard = document.createElement('div');
+            fileCard.className = 'file-card';
             
-            modal.style.display = "block";
+            const iconClass = getFileIcon(file.mimetype || 'application/octet-stream');
             
-            try {
-                if (mimetype && mimetype.startsWith('image/')) {
-                    modalBody.innerHTML = `<img src="${API_URL}/view/${filename}" class="file-preview" alt="${originalName}">`;
-                } else if (mimetype && (mimetype.startsWith('text/') || mimetype.includes('json') || mimetype.includes('xml'))) {
-                    const res = await fetch(`${API_URL}/view/${filename}`);
-                    const text = await res.text();
-                    modalBody.innerHTML = `<div class="text-preview">${text}</div>`;
-                } else {
-                    modalBody.innerHTML = `
-                        <div class="text-preview">
-                            <p>Preview not available for this file type.</p>
-                            <p>File: ${originalName}</p>
-                            <p>Type: ${mimetype || 'Unknown'}</p>
-                            <br>
-                            <button class="upload-btn" onclick="downloadFile('${filename}', '${originalName}')">
-                                <i class="fas fa-download"></i> Download File
-                            </button>
-                        </div>
-                    `;
-                }
-            } catch (err) {
-                console.error(err);
-                modalBody.innerHTML = `
-                    <div class="text-preview">
-                        <p>Error loading file preview.</p>
-                        <p>${err.message}</p>
-                    </div>
-                `;
-            }
-        }
-
-        function downloadFile(filename, originalName) {
-            const link = document.createElement('a');
-            link.href = `${API_URL}/download/${filename}`;
-            link.download = originalName;
-            link.click();
-            showNotification(`Downloading ${originalName}`);
-        }
-
-        async function deleteFile(filename, originalName) {
-            if (!confirm(`Are you sure you want to delete "${originalName}"?`)) {
-                return;
-            }
+            // Use size_formatted if available, otherwise format the raw size
+            const fileSize = file.size_formatted || formatFileSize(file.size || 0);
             
-            try {
-                const res = await fetch(`${API_URL}/delete/${filename}`, { method: "DELETE" });
-                if (!res.ok) throw new Error("Delete failed");
-                
-                showNotification(`Deleted ${originalName}`);
-                loadFiles();
-                loadStats();
-            } catch (err) {
-                console.error(err);
-                showNotification(`Failed to delete ${originalName}`, "error");
-            }
-        }
-
-        // Modal functionality
-        function closeModal() {
-            document.getElementById("fileModal").style.display = "none";
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById("fileModal");
-            if (event.target === modal) {
-                closeModal();
-            }
-        }
-
-        // Initialize
-        document.addEventListener("DOMContentLoaded", () => {
-            loadFiles();
-            loadStats();
+            fileCard.innerHTML = `
+                <div class="file-icon">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="file-name" title="${file.original_filename || file.filename}">${file.original_filename || file.filename}</div>
+                <div class="file-size">${fileSize}</div>
+                <div class="file-actions">
+                    <button class="file-btn view-btn" onclick="viewFile('${file.filename}', '${file.original_filename || file.filename}', '${file.mimetype || ''}')">
+                        <i class="fas fa-eye"></i> View
+                    </button>
+                    <button class="file-btn download-btn" onclick="downloadFile('${file.filename}', '${file.original_filename || file.filename}')">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                    <button class="file-btn delete-btn" onclick="deleteFile('${file.filename}', '${file.original_filename || file.filename}')">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            `;
+            
+            fileGrid.appendChild(fileCard);
         });
+        
+        filesList.innerHTML = '';
+        filesList.appendChild(fileGrid);
+        
+        console.log(`Successfully loaded ${files.length} files`);
+    } catch (err) {
+        console.error('Error loading files:', err);
+        const filesList = document.getElementById("filesList");
+        filesList.innerHTML = `
+            <div class="loading">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p>Failed to load files: ${err.message}</p>
+                <button class="upload-btn" onclick="loadFiles()">Try Again</button>
+            </div>
+        `;
+        showNotification("Failed to load files: " + err.message, "error");
+    }
+}
+
+// FIXED: Load stats function
+async function loadStats() {
+    try {
+        const res = await fetch(`${API_URL}/stats`, {
+            headers: {
+                'ngrok-skip-browser-warning': 'true'  // For ngrok
+            }
+        });
+        
+        if (!res.ok) throw new Error("Failed to load stats");
+
+        const data = await res.json();
+        console.log('Stats data:', data);
+        
+        const statsDiv = document.getElementById("stats");
+        
+        const fileTypesCount = Object.keys(data.file_types || {}).length;
+        
+        statsDiv.innerHTML = `
+            <div class="stat-item">
+                <div class="stat-value">${data.total_files || 0}</div>
+                <div class="stat-label">Files</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${data.total_size_formatted || '0 Bytes'}</div>
+                <div class="stat-label">Size</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${fileTypesCount}</div>
+                <div class="stat-label">Types</div>
+            </div>
+        `;
+    } catch (err) {
+        console.error('Error loading stats:', err);
+        const statsDiv = document.getElementById("stats");
+        statsDiv.innerHTML = `
+            <div class="stat-item">
+                <div class="stat-value">?</div>
+                <div class="stat-label">Error loading stats</div>
+            </div>
+        `;
+    }
+}
+
+// Search functionality
+document.getElementById("searchForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const query = document.getElementById("searchInput").value.trim();
+    if (!query) return loadFiles();
+
+    try {
+        const res = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}`, {
+            headers: {
+                'ngrok-skip-browser-warning': 'true'  // For ngrok
+            }
+        });
+        
+        if (!res.ok) throw new Error("Search failed");
+
+        const data = await res.json();
+        const filesList = document.getElementById("filesList");
+        
+        if (!data.results || data.results.length === 0) {
+            filesList.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-search"></i>
+                    <p>No files found matching "${query}"</p>
+                    <button class="upload-btn" onclick="clearSearch()">Clear Search</button>
+                </div>
+            `;
+            return;
+        }
+
+        const fileGrid = document.createElement('div');
+        fileGrid.className = 'file-grid';
+        
+        data.results.forEach((file) => {
+            const fileCard = document.createElement('div');
+            fileCard.className = 'file-card';
+            
+            const iconClass = getFileIcon(file.mimetype || 'application/octet-stream');
+            const fileSize = file.size_formatted || formatFileSize(file.size || 0);
+            
+            fileCard.innerHTML = `
+                <div class="file-icon">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="file-name" title="${file.original_filename || file.filename}">${file.original_filename || file.filename}</div>
+                <div class="file-size">${fileSize}</div>
+                <div class="file-actions">
+                    <button class="file-btn view-btn" onclick="viewFile('${file.filename}', '${file.original_filename || file.filename}', '${file.mimetype || ''}')">
+                        <i class="fas fa-eye"></i> View
+                    </button>
+                    <button class="file-btn download-btn" onclick="downloadFile('${file.filename}', '${file.original_filename || file.filename}')">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                    <button class="file-btn delete-btn" onclick="deleteFile('${file.filename}', '${file.original_filename || file.filename}')">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+                <div style="margin-top: 10px; padding: 5px; background: rgba(64,64,64,0.3); border-radius: 5px; font-size: 0.8em; color: #888;">Search result</div>
+            `;
+            
+            fileGrid.appendChild(fileCard);
+        });
+        
+        filesList.innerHTML = '';
+        filesList.appendChild(fileGrid);
+        
+        showNotification(`Found ${data.results.length} file(s) matching "${query}"`);
+    } catch (err) {
+        console.error(err);
+        showNotification("Search failed: " + err.message, "error");
+    }
+});
+
+function clearSearch() {
+    document.getElementById("searchInput").value = "";
+    loadFiles();
+}
+
+// File operations
+async function viewFile(filename, originalName, mimetype) {
+    const modal = document.getElementById("fileModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalBody = document.getElementById("modalBody");
+    
+    modalTitle.textContent = originalName;
+    modalBody.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i><p>Loading preview...</p></div>';
+    
+    modal.style.display = "block";
+    
+    try {
+        if (mimetype && mimetype.startsWith('image/')) {
+            modalBody.innerHTML = `<img src="${API_URL}/view/${filename}" class="file-preview" alt="${originalName}">`;
+        } else if (mimetype && (mimetype.startsWith('text/') || mimetype.includes('json') || mimetype.includes('xml'))) {
+            const res = await fetch(`${API_URL}/view/${filename}`, {
+                headers: {
+                    'ngrok-skip-browser-warning': 'true'
+                }
+            });
+            const text = await res.text();
+            modalBody.innerHTML = `<div class="text-preview">${text}</div>`;
+        } else {
+            modalBody.innerHTML = `
+                <div class="text-preview">
+                    <p>Preview not available for this file type.</p>
+                    <p>File: ${originalName}</p>
+                    <p>Type: ${mimetype || 'Unknown'}</p>
+                    <br>
+                    <button class="upload-btn" onclick="downloadFile('${filename}', '${originalName}')">
+                        <i class="fas fa-download"></i> Download File
+                    </button>
+                </div>
+            `;
+        }
+    } catch (err) {
+        console.error(err);
+        modalBody.innerHTML = `
+            <div class="text-preview">
+                <p>Error loading file preview.</p>
+                <p>${err.message}</p>
+            </div>
+        `;
+    }
+}
+
+function downloadFile(filename, originalName) {
+    const link = document.createElement('a');
+    link.href = `${API_URL}/download/${filename}`;
+    link.download = originalName;
+    link.click();
+    showNotification(`Downloading ${originalName}`);
+}
+
+async function deleteFile(filename, originalName) {
+    if (!confirm(`Are you sure you want to delete "${originalName}"?`)) {
+        return;
+    }
+    
+    try {
+        const res = await fetch(`${API_URL}/delete/${filename}`, { 
+            method: "DELETE",
+            headers: {
+                'ngrok-skip-browser-warning': 'true'
+            }
+        });
+        if (!res.ok) throw new Error("Delete failed");
+        
+        showNotification(`Deleted ${originalName}`);
+        loadFiles();
+        loadStats();
+    } catch (err) {
+        console.error(err);
+        showNotification(`Failed to delete ${originalName}: ${err.message}`, "error");
+    }
+}
+
+// Modal functionality
+function closeModal() {
+    document.getElementById("fileModal").style.display = "none";
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById("fileModal");
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+
+// Initialize
+document.addEventListener("DOMContentLoaded", () => {
+    console.log('DOM loaded, initializing...');
+    loadFiles();
+    loadStats();
+});
     </script>
 </body>
 </html>
